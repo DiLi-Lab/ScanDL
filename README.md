@@ -1,5 +1,14 @@
 # ScanDL
 
+This repository contains the code to reproduce the experiments in ScanDL: A Diffusion Model for Generating Synthetic Scanpaths on Texts.
+
+## Summary
+![scandl-output](img/scanpath-exp-regular.png)
+* Our proposed model ScanDL is the first diffusion model for synthetic scanpath generation
+* ScanDL is able to exhibig human-like reading behavior
+
+![scandl-workflow](img/scandl-overview.png)
+
 ## Setup
 
 ### Install requirements
