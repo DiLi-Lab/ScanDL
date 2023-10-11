@@ -5,7 +5,7 @@ This repository contains the code to reproduce the experiments in ScanDL: A Diff
 ## Summary
 ![scandl-output](img/scanpath-exp-regular.png)
 * Our proposed model ScanDL is the first diffusion model for synthetic scanpath generation
-* ScanDL is able to exhibig human-like reading behavior
+* ScanDL is able to exhibit human-like reading behavior
 
 ![scandl-workflow](img/scandl-overview.png)
 
