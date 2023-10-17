@@ -93,6 +93,7 @@ To run the inference on the trained models, indicate the folder name within the 
 * ```--bsz``` is the batch size.<br>
 * ```--cv``` must be given for the cross-validation settings and it is not given for the cross-dataset setting.<br>
 * ```--load_test_data processed_data``` is given if the data has been preprocessed and split and saved already before training; otherwise leave it away. It is never given for the ablation case of unconditional scanpath generation.<br>
+
 If you run several inference processes at the same time, make sure to choose a different ```--seed``` for each of them. During training, the model is saved for many checkpoints. If you want to run inference on every checkpoint, leave the argument ```--run_only_on``` away. However, inference is quite costly time-wise and it is thus sensible to only
 specify certain checkpoints onto which inference should be run. For that purpose, the exact path to that saved model must be given.<br>
 
