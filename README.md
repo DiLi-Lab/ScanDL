@@ -38,9 +38,11 @@ python create_data_splits.py
 
 ## Training
 
-Execute the following commands. ```--nproc_per_node``` indicates the number of GPUs over which you want to split training. <br>
-If you want to start multiple training processes at the same time, change ```--master_port``` to be different for all of them. <br>
-```--load_train_data processed_data``` means that the preprocessed data is loaded from the folder `processed_data`. If the data has not been preprocessed and saved, leave this argument away.<br>
+Execute the following commands to perform the training:
+    *Notes:
+        * ```--nproc_per_node``` indicates the number of GPUs over which you want to split training.
+        * If you want to start multiple training processes at the same time, change ```--master_port``` to be different for all of them.
+        * ```--load_train_data processed_data``` means that the preprocessed data is loaded from the folder `processed_data`. If the data has not been preprocessed and saved, leave this argument away.<br>
 
 New Reader setting
 ```bash
@@ -86,14 +88,13 @@ python -m torch.distributed.launch --nproc_per_node=4 --master_port=12233 --use_
 
 ## Inference
 
-To run the inference on the trained models, indicate the folder name within the ```checkpoint-path``` directory that refers to your trained model. <br>
-```--no_gpus``` indicates the number of GPUs across which you split the inference. It is recommended to set it to 1; if inference is split on multiple GPUs, each process
-will produce a separate outfile which will have to be combined before evaluation can be run on them.<br>
-If you run several inference processes at the same time, make sure to choose a different ```--seed``` for each of them.<br>
-```--bsz``` is the batch size.<br>
-```--cv``` must be given for the cross-validation settings and it is not given for the cross-dataset setting.<br>
-```--load_test_data processed_data``` is given if the data has been preprocessed and split and saved already before training; otherwise leave it away. It is never given for the ablation case of unconditional scanpath generation.<br>
-During training, the model is saved for many checkpoints. If you want to run inference on every checkpoint, leave the argument ```--run_only_on``` away. However, inference is quite costly time-wise and it is thus sensible to only
+To run the inference on the trained models, indicate the folder name within the ```checkpoint-path``` directory that refers to your trained model.
+* ```--no_gpus``` indicates the number of GPUs across which you split the inference. It is recommended to set it to 1; if inference is split on multiple GPUs, each process will produce a separate outfile which will have to be combined before evaluation can be run on them.
+* ```--bsz``` is the batch size.<br>
+* ```--cv``` must be given for the cross-validation settings and it is not given for the cross-dataset setting.<br>
+* ```--load_test_data processed_data``` is given if the data has been preprocessed and split and saved already before training; otherwise leave it away. It is never given for the ablation case of unconditional scanpath generation.<br>
+
+If you run several inference processes at the same time, make sure to choose a different ```--seed``` for each of them. During training, the model is saved for many checkpoints. If you want to run inference on every checkpoint, leave the argument ```--run_only_on``` away. However, inference is quite costly time-wise and it is thus sensible to only
 specify certain checkpoints onto which inference should be run. For that purpose, the exact path to that saved model must be given.<br>
 
 <br>

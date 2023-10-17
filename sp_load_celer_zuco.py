@@ -15,7 +15,7 @@ from CONSTANTS import PATH_TO_IA, PATH_TO_FIX, SUB_METADATA_PATH, path_to_zuco
 def load_celer():
     path_to_fix = PATH_TO_FIX
     path_to_ia = PATH_TO_IA
-    eyemovement_df = pd.read_csv(path_to_fix, delimiter='\t')
+    eyemovement_df = pd.read_csv(path_to_fix, delimiter='\t', low_memory=False)
     eyemovement_df['CURRENT_FIX_INTEREST_AREA_LABEL'] = eyemovement_df.CURRENT_FIX_INTEREST_AREA_LABEL.replace('\t(.*)',
                                                                                                                '',
                                                                                                                regex=True)
@@ -346,7 +346,7 @@ def process_celer(
 
     reader_IDs, sn_IDs = list(), list()
 
-    for sn_id_idx, sn_id in tqdm(enumerate(sn_list)):  # for text/sentence ID
+    for sn_id_idx, sn_id in tqdm(enumerate(sn_list), total=len(sn_list)):  # for text/sentence ID
 
         if subset_size is not None:
             if sn_id_idx == subset_size+1:
@@ -881,7 +881,7 @@ def process_zuco(
 
     reader_IDs, sn_IDs = list(), list()
 
-    for sn_id_idx, sn_id in tqdm(enumerate(sn_list)):
+    for sn_id_idx, sn_id in tqdm(enumerate(sn_list), total=len(sn_list)):
 
         if subset_size is not None:
             if sn_id_idx == subset_size + 1:

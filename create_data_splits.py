@@ -9,6 +9,7 @@ import random
 import json
 import os
 import numpy as np
+import pandas as pd
 
 from scandl.utils import dist_util, logger
 from scandl.step_sample import create_named_schedule_sampler
@@ -99,8 +100,8 @@ def main():
                 if not os.path.exists(fold_path):
                     os.makedirs(fold_path)
 
-                train_data = np.array(flattened_data)[train_idx].tolist()
-                test_data = np.array(flattened_data)[test_idx].tolist()
+                train_data = np.array(flattened_data, dtype=object)[train_idx].tolist()
+                test_data = np.array(flattened_data, dtype=object)[test_idx].tolist()
 
                 # save the train and test IDs separately (though they are also contained within train_data/test_data)
                 train_ids_reader = np.array(splitting_IDs_dict['reader'])[train_idx].tolist()
@@ -222,8 +223,8 @@ def main():
         # combine the two corpora
         word_info_df2.SN = word_info_df2.SN.values + word_info_df.SN.values.max()
         eyemovement_df2.sn = eyemovement_df2.sn.values + eyemovement_df.sn.values.max()
-        word_info_df = word_info_df.append(word_info_df2)
-        eyemovement_df = eyemovement_df.append(eyemovement_df2)
+        word_info_df = pd.concat([word_info_df, word_info_df2])
+        eyemovement_df = pd.concat([eyemovement_df, eyemovement_df2])
 
         # lists with unique sentence and reader IDs
         sn_list = np.unique(eyemovement_df.sn.values).tolist()
