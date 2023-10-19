@@ -188,7 +188,7 @@ If you are using ScanDL, please consider citing our work:
 ```bibtex
 @inproceedings{bolliger2023scandl,
     author = {Bolliger, Lena S. and Reich, David R. and Haller, Patrick and Jakobi, Deborah N. and Prasse, Paul and J{\"a}ger, Lena A.},
-    title = {{S}can{DL}: {A} {D}iffusion {M}odel for {G}enerating {S}ynthetic {S}canpaths on {T}exts},
+    title = {{S}can{DL}: {A} Diffusion Model for Generating Synthetic Scanpaths on Texts},
     booktitle={The 2023 Conference on Empirical Methods in Natural Language Processing},
     year={2023},
     publisher = {Association for Computational Linguistics},
