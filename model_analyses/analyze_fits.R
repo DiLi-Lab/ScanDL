@@ -104,30 +104,7 @@ get_all_results <- function(setting){
   return(all_results)
 }
 
-myjit <- ggproto("fixJitter", PositionDodge,
-                 width = 0.3,
-                 dodge.width = 0.25,
-                 jit = NULL,
-                 compute_panel =  function (self, data, params, scales)
-                 {
-
-                   #Generate Jitter if not yet
-                   if(is.null(self$jit) ) {
-                    self$jit <-jitter(rep(0, nrow(data)), amount=self$dodge.width)
-                   }
-
-                   data <- ggproto_parent(PositionDodge, self)$compute_panel(data, params, scales)
-
-                   data$x <- data$x + self$jit
-                   #For proper error extensions
-                   if("xmin" %in% colnames(data)) data$xmin <- data$xmin + self$jit
-                   if("xmax" %in% colnames(data)) data$xmax <- data$xmax + self$jit
-                   data
-                 }
-)
-
-
-make_plots_bayes <- function(all_results){
+make_plots_bayes <- function(all_results, reduced_bl){
   colors <- c(
     sequential_hcl(7, palette = "BuGn")[3], #human
     sequential_hcl(7, palette = "PuRd")[3], # scandl
@@ -135,22 +112,26 @@ make_plots_bayes <- function(all_results){
     sequential_hcl(7, palette = "YlGnBu")[c(2, 4)],
     sequential_hcl(7, palette = "Turku")[c(4, 6)] # unif and td
 )
+  if(reduced_bl==TRUE){
+    colors <- colors[1:5]
+  }
   p<-ggplot(all_results,
             aes(x=effect, y=mean_effect_size, colour=source, position = "dodge")) +
     scale_x_discrete(guide = guide_axis(angle = 20)) +
     scale_color_manual(values=colors) +
+    geom_point(position =position_dodge(width=.5), size = 0.25, shape=1) +
     geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper),
-                       width=.25, position = myjit) +
-    geom_point(position = myjit, size = 0.2) +
+                       width=.25, position=position_dodge(width=.5), linewidth=0.4) +
     # facet_wrap(reading_measure ~ .) +
     facet_rep_wrap(reading_measure ~ .,  scales = "free_y")  +
-    geom_hline(yintercept=0, linetype="dashed", color = "grey51") +
+    geom_hline(yintercept=0, linetype="dashed", color = "grey51", linewidth = 0.2) +
     xlab("Psycholinguistic phenomenon") + ylab("Posterior effect estimate") +
     theme_light() +
     theme(legend.position="top", legend.box = "horizontal") +
     guides(colour = guide_legend(label.position = "bottom")) +
-    guides(colour=guide_legend(title="Model"))
-  ggsave(paste0("pl_analysis/figs/pla_", opt$setting, "_", opt$steps, ".jpg"), width = 5, height = 6, dpi=500)
+    guides(colour=guide_legend(title="Model")) +
+    guides(colour = guide_legend(title="Model", nrow=2,byrow=TRUE))
+  ggsave(paste0("pl_analysis/figs/pla_new_all_", opt$setting, "_", opt$steps, ".jpg"), width = 5, height = 6, dpi=500)
   return(1)
 }
 
@@ -175,13 +156,17 @@ create_summary_tables <- function(df){
   return(1)
 }
 
-main <- function(){
+main <- function(reduced_bl){
   all_results <- get_all_results(setting=opt$setting)
   all_results$source <- factor(all_results$source)
   levels(all_results$source) <- c('Eyettention', 'EZ-reader', 'Human', 'ScanDL', 'SWIFT', 'Train-label-dist', 'Uniform')
   all_results$source <- factor(
     all_results$source, levels =  c('Human', 'ScanDL', 'Eyettention', 'EZ-reader', 'SWIFT', 'Train-label-dist', 'Uniform')
   )
+  if(reduced_bl){
+    all_results <- all_results[!(all_results$source %in% c('Train-label-dist', 'Uniform')), ]
+    all_results$source <- droplevels(all_results$source)
+  }
   all_results$effect <- factor(all_results$effect)
   levels(all_results$effect) <- c('lexical frequency', 'surprisal', 'word length')
   all_results$reading_measure <- factor(all_results$reading_measure)
@@ -191,8 +176,8 @@ main <- function(){
     all_results$reading_measure, levels = c('skipping rate', 'first-pass regression rate',
                                             'total fixation count', 'first-pass fixation count'))
 
-  make_plots_bayes(all_results)
+  make_plots_bayes(all_results, reduced_bl = reduced_bl)
   create_summary_tables(all_results)
 }
 
-main()
+main(reduced_bl = FALSE)

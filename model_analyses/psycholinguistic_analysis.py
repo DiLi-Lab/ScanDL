@@ -1,6 +1,4 @@
 from collections import defaultdict
-import numpy as np
-from typing import Dict, Tuple, List, Union
 import pandas as pd
 import json
 import re
@@ -64,8 +62,8 @@ class ResultFiles:
             self.result_file_paths = self.get_scandl_result_files()
 
     def get_baseline_files(self):
-        print(sorted(glob(f'{self.root_path}/{self.model}/*/ps_*.pickle')))
-        return sorted(glob(f'{self.root_path}/{self.model}/*/ps_*.pickle'))
+        # print(sorted(glob(f'{self.root_path}/{self.model}/*/ps_*.pickle')))
+        return sorted(glob(f'{self.root_path}/{self.model}/*/*.pickle'))
 
     def get_original_data_result_files(self):
         original_data_files = sorted(glob(f'{self.root_path}/original_data/*/*.json'))
@@ -73,9 +71,9 @@ class ResultFiles:
 
     def get_scandl_result_files(self):
         if self.setting == 'cross_dataset':
-            result_files = sorted(glob(f'{self.results_path}/ema_0.9999_{self.steps:06d}.pt.samples/all_output_remove-PAD_seed{self.seed}.json', recursive=True))
+            result_files = sorted(glob(f'scandl/ema_0.9999_{self.steps:06d}.pt.samples/all_output_remove-PAD_seed{self.seed}.json', recursive=True))
         else:
-            result_files = sorted(glob(f'{self.results_path}/fold*/ema_0.9999_{self.steps:06d}.pt.samples/all_output_remove-PAD_seed{self.seed}.json', recursive=True))
+            result_files = sorted(glob(f'{self.root_path}/scandl/fold*/*/output_w_nld.json', recursive=True))
         return result_files
 
     def get_annotations(self):
@@ -197,13 +195,24 @@ class Annotations:
     def load_baseline_file(self):
         file = open(self.directory, 'rb')
         results = pickle.load(file)
+        self.predicted_sp_ids = results["predicted_sp_ids"]
+        self.predicted_sp_words = results["predicted_sp_words"]
+        self.original_sn = results["original_sn"]
+        self.reader_ids = results["reader_ids"]
+        self.sentence_ids = results["sn_ids"]
+        self.get_sent_lengths()
+
+    def load_swift_ez_file(self):
+        file = open(self.directory, 'rb')
+        results = pickle.load(file)
         counter = 0
         na_counter = 0
         for _, value in results.items():
             counter += 1
             try:
                 if self.model in ['uniform', 'traindist', 'local']:
-                    words = value['sentence'].tolist().split()
+                    words = value['original_sn'].tolist().split()
+                    self.reader_ids.append(value['reader_ids'])
                 else:
                     words = value['sentence'].tolist()[0].split()
             except TypeError:
@@ -217,17 +226,17 @@ class Annotations:
                 ...
             else:
                 if self.model in ['uniform', 'traindist', 'local']:
-                    self.original_sn.append(value['sentence'].tolist())
+                    self.original_sn.append(value['original_sn'].tolist())
                 else:
                     self.original_sn.extend(value['sentence'].tolist())
-                self.original_sp_ids.append(value['orig_ids'].tolist())
+                self.original_sp_ids.append(value['original_sp_ids'].tolist())  # TODO funktioniert n mehr für swift/ez: orig_ids
                 # self.original_sp_words.append(' '.join(value['orig_words'].tolist()))
-                self.predicted_sp_ids.append(value['pred_ids'].tolist())
+                self.predicted_sp_ids.append(value['predicted_sp_ids'].tolist())  # TODO funktioniert n mehr für swift/ez: orig_ids
                 # self.predicted_sp_words.append(' '.join(value['pred_words'].tolist())) # something weird here
-        self.reader_ids = len(self.original_sn) * [-1]
+        # self.reader_ids = len(self.original_sn) * [-1]
         self.sentence_ids = len(self.original_sn) * [-1]
         self.get_sent_lengths()
-        print('nas/all: ', na_counter, '/',counter)
+        # print('nas/all: ', na_counter, '/',counter)
 
     def load_results_original(self):
         with open(self.directory, 'rb') as f:
