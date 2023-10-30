@@ -94,8 +94,6 @@ def main():
 
     test_set_sns = args.unique_sns
 
-    output_lst = []
-
     if not args.cv:
 
         for lst in glob.glob(args.model_dir):
@@ -113,7 +111,7 @@ def main():
                     if checkpoint_one != args.run_only_on:
                         continue
 
-                COMMAND = f'python -m torch.distributed.launch --nproc_per_node={args.no_gpus} --master_port={22233 + int(args.seed)} --use_env sp_sample_seq2seq.py ' \
+                COMMAND = f'python -m torch.distributed.launch --nproc_per_node={args.no_gpus} --master_port={22233 + int(args.seed)} --use_env scripts/sp_sample_seq2seq.py ' \
                           f'--model_path {checkpoint_one} --step {args.step} ' \
                           f'--batch_size {args.bsz} --seed2 {args.seed} --split {args.split} ' \
                           f'--out_dir {out_dir} --top_p {args.top_p} --clamp_first {args.clamp_first} ' \
@@ -144,7 +142,7 @@ def main():
                         if checkpoint_one != args.run_only_on:
                             continue
 
-                    COMMAND = f'python -m torch.distributed.launch --nproc_per_node={args.no_gpus} --master_port={22233 + int(args.seed)} --use_env sp_sample_seq2seq.py ' \
+                    COMMAND = f'python -m torch.distributed.launch --nproc_per_node={args.no_gpus} --master_port={22233 + int(args.seed)} --use_env scripts/sp_sample_seq2seq.py ' \
                               f'--model_path {checkpoint_one} --step {args.step} ' \
                               f'--batch_size {args.bsz} --seed2 {args.seed} --split {args.split} ' \
                               f'--out_dir {out_dir} --top_p {args.top_p} --clamp_first {args.clamp_first} ' \

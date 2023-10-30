@@ -18,18 +18,18 @@ import torch.nn as nn
 import numpy as np
 import torch.distributed as dist
 from transformers import set_seed
-from transformers import BertTokenizerFast, AutoConfig
+from transformers import BertTokenizerFast
 from datasets import load_from_disk
 
 from scandl.sp_rounding import denoised_fn_round
 from scandl.utils import dist_util, logger
 from scandl.utils.nn import *
-from sp_load_celer_zuco import celer_zuco_dataset_and_loader
-from sp_load_celer_zuco import load_zuco, process_zuco
+from scripts.sp_load_celer_zuco import celer_zuco_dataset_and_loader
+from scripts.sp_load_celer_zuco import load_zuco, process_zuco
 from visualizations.attention_visualization import attention_visualization
 from visualizations.plot_scanpath import plot_scanpath_image
 from visualizations.plot_tsne import plot_tsne
-from sp_basic_utils import (
+from scripts.sp_basic_utils import (
     load_defaults_config,
     create_model_and_diffusion,
     add_dict_to_argparser,
@@ -102,7 +102,6 @@ def main():
         raise RuntimeError('choose a smaller batch size (<=12) when plotting tSNE plots because tensors are all '
                            'moved to CPU.')
 
-
     logger.log("### Creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(
         **args_to_dict(args, load_defaults_config().keys())
@@ -117,8 +116,6 @@ def main():
 
     model.eval().requires_grad_(False).to(dist_util.dev())
 
-    model_config = AutoConfig.from_pretrained(args.config_name)
-
     sn_sp_repr_embedding = nn.Embedding(
         num_embeddings=args.hidden_t_dim,
         embedding_dim=args.hidden_dim,
@@ -128,8 +125,6 @@ def main():
     set_seed(args.seed2)
 
     print("### Sampling...on", args.split)
-
-
     if args.inference != 'cv':  # cross-dataset setting: train on celer, test on zuco
 
         if args.inference == 'zuco':
@@ -243,7 +238,7 @@ def main():
         out_path_incrementally_pad = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_running_remove-PAD_rank{rank}.json")
         out_path_all_pad = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_all_remove-PAD_rank{rank}.json")
         out_path_incrementally_sep = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_running_cut-off-SEP_rank{rank}.json")
-        out_path_all_sep = os.path.join(out_path,  f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_all_cut-off-SEP_rank{rank}.json")
+        out_path_all_sep = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_all_cut-off-SEP_rank{rank}.json")
         if os.path.exists(out_path_all_pad):
             print(' --- inference has already been done on this output.')
             sys.exit()
@@ -323,8 +318,6 @@ def main():
         words_for_mapping = batch['words_for_mapping']
         sn_ids = batch['sn_ids']
         reader_ids = batch['reader_ids']
-
-        mask_orig = mask
 
         # needed for attention visualisation
         subwords = [tokenizer.convert_ids_to_tokens(i) for i in sn_input_ids]
@@ -410,7 +403,7 @@ def main():
             pred_seq_sp = pred_seq[sn_len:]
             orig_ids_sp = orig_ids[sn_len:]
 
-            ### cut off all trailing PAD tokens ###
+            # # # cut off all trailing PAD tokens # # #
 
             words_split = orig_words.split()
             # map the predicted indices to the words
@@ -422,15 +415,15 @@ def main():
             # the original sp IDs
             orig_sp_ids = [e.item() for e in orig_ids_sp]
 
-            ### cut off all trailing PAD tokens ###
+            # # # cut off all trailing PAD tokens # # #
 
             while len(predicted_sp) > 1 and predicted_sp[-1] == '[PAD]':
                 predicted_sp.pop()
-            while len(pred_sp_ids) > 1 and pred_sp_ids[-1] == args.seq_len-1:
+            while len(pred_sp_ids) > 1 and pred_sp_ids[-1] == args.seq_len - 1:
                 pred_sp_ids.pop()
             while len(original_sp) > 1 and original_sp[-1] == '[PAD]':
                 original_sp.pop()
-            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len-1:
+            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len - 1:
                 orig_sp_ids.pop()
             while len(words_split) > 1 and words_split[-1] == '[PAD]':
                 words_split.pop()
@@ -527,9 +520,7 @@ def main():
                         with open(out_path_incrementally_pad, 'w') as f:
                             json.dump(loaded_data_dict, f)
                     dist.barrier()
-
-
-            ### cut off at first SEP token ###
+            # # # cut off at first SEP token # # #
 
             words_split = orig_words.split()
             # map the predicted indices to the words
@@ -543,7 +534,7 @@ def main():
 
             while len(original_sp) > 1 and original_sp[-1] == '[PAD]':
                 original_sp.pop()
-            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len-1:
+            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len - 1:
                 orig_sp_ids.pop()
             while len(words_split) > 1 and words_split[-1] == '[PAD]':
                 words_split.pop()
@@ -551,12 +542,12 @@ def main():
 
             for idx, predicted_sp_id in enumerate(pred_sp_ids):
                 if predicted_sp_id == sep_token_id:
-                    pred_sp_ids = pred_sp_ids[:idx+1]
+                    pred_sp_ids = pred_sp_ids[:idx + 1]
                     break
 
             for idx, predicted_sp_word in enumerate(predicted_sp):
                 if predicted_sp_word == '[SEP]':
-                    predicted_sp = predicted_sp[:idx+1]
+                    predicted_sp = predicted_sp[:idx + 1]
                     break
 
             # predicted scan path in words

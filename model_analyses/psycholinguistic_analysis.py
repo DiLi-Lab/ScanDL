@@ -24,7 +24,7 @@ args = parser.parse_args()
 
 STOP_CHARS_SURP = []
 BASELINES = ['ez-reader', 'local', 'traindist', 'uniform', 'swift']
-Path("./pl_analysis/reading_measures").mkdir(exist_ok=True)
+Path("./pl_analysis/reading_measures").mkdir(parents=True, exist_ok=True)
 
 
 class ResultFiles:

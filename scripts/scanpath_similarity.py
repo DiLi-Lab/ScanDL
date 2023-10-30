@@ -10,6 +10,7 @@ def levenshtein_distance(gt: list[int], pred: list[int]) -> float:
 def levenshtein_similarity(gt: list[int], pred: list[int]) -> float:
     return textdistance.levenshtein.similarity(gt, pred)
 
+
 def levenshtein_normalized_similarity(gt: list[int], pred: list[int]) -> float:
     return textdistance.levenshtein.normalized_similarity(gt, pred)
 
