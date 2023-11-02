@@ -370,7 +370,7 @@ If you are using ScanDL, please consider citing our work:
 
 ## Acknowledgements
 
-As indicated in the paper, our code is based on the implementation of the [implementation](https://github.com/Shark-NLP/DiffuSeq) of [DiffuSeq](
+As indicated in the paper, our code is based on the [implementation](https://github.com/Shark-NLP/DiffuSeq) of [DiffuSeq](
 https://doi.org/10.48550/arXiv.2210.08933).
 
 
