@@ -34,7 +34,7 @@ def setup_dist():
         port = _find_free_port()
         os.environ["MASTER_PORT"] = str(port)
         os.environ['LOCAL_RANK'] = str(0)
-    
+
     dist.init_process_group(backend=backend, init_method="env://")
 
     if th.cuda.is_available():  # This clears remaining caches in GPU 0

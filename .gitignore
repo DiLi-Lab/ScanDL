@@ -1,0 +1,6 @@
+*.pyc
+checkpoint-path/
+generation_outputs/
+processed_data/
+wandb/
+data/

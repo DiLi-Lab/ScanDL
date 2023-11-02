@@ -1,6 +1,7 @@
 import argparse
 import torch
-import json, os
+import json
+import os
 import time
 
 from scandl import sp_gaussian_diffusion as gd
@@ -42,7 +43,7 @@ def create_model_and_diffusion(
 ):
     model = TransformerNetModel(
         input_dims=hidden_dim,
-        output_dims=(hidden_dim if not learn_sigma else hidden_dim*2),
+        output_dims=(hidden_dim if not learn_sigma else hidden_dim * 2),
         hidden_t_dim=hidden_t_dim,
         num_transformer_layers=num_transformer_layers,
         num_transformer_heads=num_transformer_heads,

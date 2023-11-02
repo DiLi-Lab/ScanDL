@@ -6,7 +6,7 @@ from pathlib import Path
 
 STOP_CHARS_SURP = []
 BASELINES = ['ez-reader', 'local', 'traindist', 'uniform', 'swift']
-Path("./pl_analysis/reading_measures").mkdir(exist_ok=True)
+Path("./pl_analysis/reading_measures").mkdir(parents=True, exist_ok=True)
 
 
 def get_average_over_sentlen(lst, sent_len):

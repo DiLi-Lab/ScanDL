@@ -82,14 +82,13 @@ def _dummy_pad_words(
 ):
     padded_examples = list()
     for instance in examples:
-        padded_examples.append(instance + (max_length-len(instance)) * [pad_token_id])
+        padded_examples.append(instance + (max_length - len(instance)) * [pad_token_id])
     return padded_examples
 
 
 def infinite_loader(data_loader):
     while True:
         yield from data_loader
-
 
 
 def celer_zuco_dataset_and_loader(
@@ -115,7 +114,6 @@ def celer_zuco_dataset_and_loader(
         return infinite_loader(data_loader)
     else:
         return iter(data_loader)
-
 
 
 def combined_split(data, reader_IDs, sn_IDs, test_size):
@@ -147,7 +145,7 @@ def combined_split(data, reader_IDs, sn_IDs, test_size):
     return train_data, test_data, train_reader_IDs, test_reader_IDs, train_sn_IDs, test_sn_IDs
 
 
-def load_zuco(task: str=None): # 'zuco11', 'zuco12'
+def load_zuco(task: str = None):  # 'zuco11', 'zuco12'
     dir = path_to_zuco
     if task.startswith('zuco1'):
         dir = dir + 'zuco/'
@@ -177,7 +175,7 @@ def get_kfold_indices_scanpath(
 
     # list of indices of the sn-reader pairs of unique sentences
     unique_sns_ids = [idx for (idx, reader_ID, sn_ID) in tuple_ids if not sn_ID.startswith('en')]
-  #  unique_sns_indices = {sn_ID: idx for (idx, reader_ID, sn_ID) in tuple_ids if not sn_ID.startswith('en')}
+    # unique_sns_indices = {sn_ID: idx for (idx, reader_ID, sn_ID) in tuple_ids if not sn_ID.startswith('en')}
     universal_sn_ids = [idx for (idx, reader_ID, sn_ID) in tuple_ids if sn_ID.startswith('en')]
 
     # get the reader IDs for the unique and universal sns
@@ -330,11 +328,10 @@ def process_celer(
 
     data = {
         'mask': list(),  # 0 for sn, 1 for sp
-        'sn_sp_repr': list(),  # word IDs of sn and corresponding word IDs of sp (fixated words, interest area IDs),
-                                # padded with args.seq_len -1
+        'sn_sp_repr': list(),  # word IDs of sn and corresponding word IDs of sp (fixated words, interest area IDs) padded with args.seq_len -1
         'sn_input_ids': list(),  # input IDs of tokenized sentence, padded with pad token ID
         'indices_pos_enc': list(),  # indices from 1 ... len(sn input ids) 1 ... (seq_len - len(sn input ids))
-        'sn_repr_len': list(), # length of sentence in subword tokens
+        'sn_repr_len': list(),  # length of sentence in subword tokens
         'words_for_mapping': list(),   # original words of sentence, padded with PAD
         'mask_sn_padding': list(),  # masks both the sentence and the padding, for the loss computations
         'mask_transformer_att': list(),  # masks only the padding, for the transformer attention,
@@ -349,7 +346,7 @@ def process_celer(
     for sn_id_idx, sn_id in tqdm(enumerate(sn_list), total=len(sn_list)):  # for text/sentence ID
 
         if subset_size is not None:
-            if sn_id_idx == subset_size+1:
+            if sn_id_idx == subset_size + 1:
                 break
 
         # subset the fixations report DF to a DF containing only the current sentence/text ID (each sentence appears multiple times)
@@ -358,12 +355,8 @@ def process_celer(
         # subset the interest area report DF to a DF containing only the current sentence/text ID
         sn = word_info_df[word_info_df.sentenceid == sn_id]
         # sn is a dataframe containing only one sentence (the sentence with the current sentence ID)
-        sn = sn[
-            sn['list'] == sn.list.values.tolist()[0]]  # list = experimental list number (unique to each participant).
+        sn = sn[sn['list'] == sn.list.values.tolist()[0]]  # list = experimental list number (unique to each participant).
         # compute word length and frequency features for each word
-        sn_word_len = compute_word_length(sn.WORD_LEN.values)
-        sn_word_freq = compute_word_frequency(
-            sn.FREQ_BLLIP.values)  # FREQ-BLLIP -log2(word frequency) in BLLIP (Charniak et al. 2000).
         sn_str = sn.sentence.iloc[-1]  # the whole sentence as string
         if sn_id == '1987/w7_019/w7_019.295-3' or sn_id == '1987/w7_036/w7_036.147-43' or sn_id == '1987/w7_091/w7_091.360-6':
             # extra inverted commas at the end of the sentence
@@ -376,7 +369,6 @@ def process_celer(
             continue
 
         sn_len = len(sn_str.split())
-        sn_split = sn_str.split()
 
         # add CLS and SEP 'manually' to the sentence so that they receive the word IDs 0 and len(sn)+1
         sn_str = '[CLS] ' + sn_str + ' [SEP]'
@@ -414,17 +406,15 @@ def process_celer(
                         merge_flag = True
 
                     else:
-                        if outlier_i - 1 >= 0 and merge_flag == False:
+                        if outlier_i - 1 >= 0 and not merge_flag:
                             # try to merge with the left fixation if they landed both on the same interest area
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i - 1] = sp_fix_dur[outlier_i - 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
-                        if outlier_i + 1 < len(sp_fix_dur) and merge_flag == False:
+                        if outlier_i + 1 < len(sp_fix_dur) and not merge_flag:
                             # try to merge with the right fixation
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i + 1] = sp_fix_dur[outlier_i + 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
@@ -537,7 +527,7 @@ def process_celer(
     )
     data['sn_sp_repr'] = _collate_batch_helper(
         examples=data['sn_sp_repr'],
-        pad_token_id=args.seq_len-1,
+        pad_token_id=args.seq_len - 1,
         max_length=args.seq_len,
     )
     data['sn_input_ids'] = _collate_batch_helper(
@@ -913,17 +903,15 @@ def process_zuco(
                 for out_idx in range(len(outlier_indx)):
                     outlier_i = outlier_indx[out_idx]
                     merge_flag = False
-                    if outlier_i - 1 >= 0 and merge_flag == False:
+                    if outlier_i - 1 >= 0 and not merge_flag:
                         # try to merge with the left fixation
-                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                            outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                             sp_fix_dur[outlier_i - 1] = sp_fix_dur[outlier_i - 1] + sp_fix_dur[outlier_i]
                             merge_flag = True
 
-                    if outlier_i + 1 < len(sp_fix_dur) and merge_flag == False:
+                    if outlier_i + 1 < len(sp_fix_dur) and not merge_flag:
                         # try to merge with the right fixation
-                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                            outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                             sp_fix_dur[outlier_i + 1] = sp_fix_dur[outlier_i + 1] + sp_fix_dur[outlier_i]
                             merge_flag = True
 
@@ -967,7 +955,7 @@ def process_zuco(
             assert len(sn_word_ids) == len(sn_input_ids)
 
             max_len = max(max_len, len(sn_word_ids) + len(sp_word_ids))
-            all_lens.append(len(sn_word_ids)+len(sp_word_ids))
+            all_lens.append(len(sn_word_ids) + len(sp_word_ids))
 
             # truncating
             sep_token_sn_word_ids = sn_word_ids[-1]
@@ -997,10 +985,8 @@ def process_zuco(
             sn_sp_repr = sn_word_ids + sp_word_ids
 
             mask = [0] * len(sn_word_ids)
-            mask_sn_padding = [0] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (
-                        args.seq_len - len(sn_word_ids) - len(sp_word_ids))
-            mask_transformer_att = [1] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (
-                        args.seq_len - len(sn_word_ids) - len(sp_word_ids))
+            mask_sn_padding = [0] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (args.seq_len - len(sn_word_ids) - len(sp_word_ids))
+            mask_transformer_att = [1] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (args.seq_len - len(sn_word_ids) - len(sp_word_ids))
 
             indices_pos_enc = list(range(0, len(sn_word_ids))) + list(range(0, args.seq_len - len(sn_word_ids)))
 
@@ -1281,6 +1267,3 @@ def process_zuco(
             test_data_dict['test'] = test_dataset
             val_data_dict['val'] = val_dataset
             return train_data_dict, test_data_dict, val_data_dict
-
-
-

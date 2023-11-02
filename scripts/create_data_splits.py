@@ -5,35 +5,23 @@ Save all data sets as well as only the reader and sn ids (for the baselines).
 """
 
 import argparse
-import random
-import json
 import os
 import numpy as np
 import pandas as pd
 
-from scandl.utils import dist_util, logger
-from scandl.step_sample import create_named_schedule_sampler
-from sp_basic_utils import (
+from scripts.sp_basic_utils import (
     load_defaults_config,
-    create_model_and_diffusion,
-    args_to_dict,
     add_dict_to_argparser,
 )
-import torch.distributed as dist
-from sklearn.model_selection import train_test_split
-from sp_train_util import TrainLoop
-from sp_load_celer_zuco import load_celer, load_celer_speakers, process_celer, celer_zuco_dataset_and_loader
-from sp_load_celer_zuco import load_zuco, process_zuco, get_kfold, get_kfold_indices_combined
-from sp_load_celer_zuco import flatten_data, unflatten_data
-from sp_load_celer_zuco import get_kfold_indices_scanpath
-from transformers import set_seed, BertTokenizerFast, BertConfig
-import wandb
-from datasets import load_from_disk
+from scripts.sp_load_celer_zuco import load_celer, load_celer_speakers, process_celer
+from scripts.sp_load_celer_zuco import load_zuco, process_zuco, get_kfold, get_kfold_indices_combined
+from scripts.sp_load_celer_zuco import flatten_data, unflatten_data
+from transformers import set_seed, BertTokenizerFast
 
 os.environ["WANDB_MODE"] = "offline"
 
 
-def create_argparser():
+def create_argparser() -> argparse.ArgumentParser:
     """ Loads the config from the file scandl/config.json and adds all keys and values in the config dict
     to the argument parser where config values are the argparse arguments' default values. """
     defaults = dict()
@@ -46,7 +34,7 @@ def create_argparser():
 
 def main():
 
-    print('loading args')
+    print('Loading argument parser...')
     args = create_argparser().parse_args()
 
     set_seed(args.seed)
@@ -58,12 +46,12 @@ def main():
 
     # load celer for all settings except cross-dataset
 
-    print('loading word info df')
+    print('Loading word info and eye movement df...')
     word_info_df, eyemovement_df = load_celer()
     reader_list = load_celer_speakers(only_native_speakers=args.celer_only_L1)
     sn_list = np.unique(word_info_df[word_info_df['list'].isin(reader_list)].sentenceid.values).tolist()
 
-    print('loading data')
+    print('Loading data for within dataset evaluation...')
     data, splitting_IDs_dict = process_celer(
         sn_list=sn_list,
         reader_list=reader_list,
@@ -72,7 +60,7 @@ def main():
         tokenizer=tokenizer,
         args=args,
         inference='cv',
- #       subset_size=200,
+        # subset_size=200,
     )
 
     # flatten the data for subsequent splitting
@@ -193,7 +181,7 @@ def main():
         word_info_df, eyemovement_df = load_celer()
         reader_list = load_celer_speakers(only_native_speakers=args.celer_only_L1)
         sn_list = np.unique(word_info_df[word_info_df['list'].isin(reader_list)].sentenceid.values).tolist()
-
+        print('Loading data for cross dataset evaluation...')
         train_data, val_data = process_celer(
             sn_list=sn_list,
             reader_list=reader_list,
@@ -205,7 +193,6 @@ def main():
             split_sizes=split_sizes,
             splitting_criterion=args.data_split_criterion,
         )
-
         train_data.save_to_disk(os.path.join(data_path, 'train_data'))
         val_data.save_to_disk(os.path.join(data_path, 'val_data'))
 
@@ -231,6 +218,7 @@ def main():
         reader_list = np.unique(eyemovement_df.id.values).tolist()
 
         # call the split 'train' so that the data is not split at all; use all zuco data for inference
+        print('Loading ZuCo data...')
         test_data = process_zuco(
             sn_list=sn_list,
             reader_list=reader_list,
@@ -251,12 +239,5 @@ def main():
             np.save(f, test_ids, allow_pickle=True)
 
 
-
-
-
-
-
-
-
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

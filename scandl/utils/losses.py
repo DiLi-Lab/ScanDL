@@ -84,7 +84,7 @@ def gaussian_density(x, *, means, log_scales):
     from torch.distributions import Normal
     normal_dist = Normal(means, log_scales.exp())
     logp = normal_dist.log_prob(x)
-    return logp 
+    return logp
 
 
 def discretized_text_log_likelihood(x, *, means, log_scales):
@@ -100,7 +100,7 @@ def discretized_text_log_likelihood(x, *, means, log_scales):
     """
     print(x.shape, means.shape)
     # assert x.shape == means.shape == log_scales.shape
-    print(x, means) 
+    print(x, means)
     centered_x = x - means
     inv_stdv = th.exp(-log_scales)
     plus_in = inv_stdv * (centered_x + 1.0 / 255.0)

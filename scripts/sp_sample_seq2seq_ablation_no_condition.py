@@ -1,10 +1,11 @@
 """
 Run inference on ScanDL.
-Ablation: without positional embedding and BERT embedding (New Reader/New Sentence)
+Ablation: without condition (sentence): unconditional scanpath generation (New Reader/New Sentence)
 """
 
 import argparse
-import os, json
+import os
+import json
 import sys
 import time
 
@@ -13,15 +14,15 @@ import torch.nn as nn
 import torch.distributed as dist
 from transformers import set_seed
 from datasets import load_from_disk
-from transformers import BertTokenizerFast, AutoConfig
+from functools import partial
+from transformers import BertTokenizerFast
 
 from scandl.sp_rounding import denoised_fn_round
-from sp_load_celer_zuco import celer_zuco_dataset_and_loader
-from visualizations.attention_visualization import attention_visualization
 from scandl.utils import dist_util, logger
 from scandl.utils.nn import *
-from functools import partial
-from sp_basic_utils_ablation import (
+from scripts.sp_load_celer_zuco_ablation_no_condition import celer_zuco_dataset_and_loader
+from visualizations.attention_visualization import attention_visualization
+from scripts.sp_basic_utils_ablation_no_condition import (
     load_defaults_config,
     create_model_and_diffusion,
     add_dict_to_argparser,
@@ -43,7 +44,6 @@ def get_parser() -> argparse.ArgumentParser:
         sp_vis=False,
         no_inst=0,
         atten_vis_sp=False,
-        load_test_data='-',
     )
     decode_defaults = dict(
         split='valid',
@@ -103,8 +103,6 @@ def main():
 
     model.eval().requires_grad_(False).to(dist_util.dev())
 
-    model_config = AutoConfig.from_pretrained(args.config_name)
-
     sn_sp_repr_embedding = nn.Embedding(
         num_embeddings=args.hidden_t_dim,
         embedding_dim=args.hidden_dim,
@@ -116,20 +114,12 @@ def main():
     print("### Sampling...on", args.split)
 
     if args.inference != 'cv':   # cross-dataset setting: train on celer, test on zuco
-        raise SystemExit('this ablation case is supposed to be trained and tested on only on celer in CV')
+        raise SystemExit('these ablation runs should be done on CV on celer only.')
 
-    else: # inference on the cross-validation settings
+    else:  # inference on the cross-validation settings
 
-        if args.load_test_data != '-':
-            # load the test data that was saved and pre-processed even before training
-            fold = args.model_path.split('/')[-2]
-            path_to_data_dir = os.path.join(args.load_test_data, args.data_split_criterion, fold)
-            test_data = load_from_disk(os.path.join(path_to_data_dir, 'test_data'))
-            print('\t\t--- load test data from disk!')
-
-        else:
-            # load the test data that was split off from all data during training
-            test_data = load_from_disk(f'{args.checkpoint_path}/test_data')
+        # load the test data that was split off from all data during training
+        test_data = load_from_disk(f'{args.checkpoint_path}/test_data')
 
         test_loader = celer_zuco_dataset_and_loader(
             data=test_data,
@@ -156,7 +146,7 @@ def main():
         out_path_incrementally_pad = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_running_remove-PAD_rank{rank}.json")
         out_path_all_pad = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_all_remove-PAD_rank{rank}.json")
         out_path_incrementally_sep = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_running_cut-off-SEP_rank{rank}.json")
-        out_path_all_sep = os.path.join(out_path,  f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_all_cut-off-SEP_rank{rank}.json")
+        out_path_all_sep = os.path.join(out_path, f"seed{args.seed2}_step{args.clamp_step}_clamp-first-{args.clamp_first}_all_cut-off-SEP_rank{rank}.json")
         if os.path.exists(out_path_all_pad):
             print(' --- inference has already been done on this output.')
             sys.exit()
@@ -226,32 +216,26 @@ def main():
                 dist.barrier()
             continue
 
-        mask = batch['mask'].to(dist_util.dev())
-        sn_sp_repr = batch['sn_sp_repr'].to(dist_util.dev())
+        sp_word_ids = batch['sp_word_ids'].to(dist_util.dev())
         sn_input_ids = batch['sn_input_ids'].to(dist_util.dev())
         indices_pos_enc = batch['indices_pos_enc'].to(dist_util.dev())
-        sn_repr_len = batch['sn_repr_len'].to(dist_util.dev())
         words_for_mapping = batch['words_for_mapping']
         sn_ids = batch['sn_ids']
         reader_ids = batch['reader_ids']
 
-        mask_orig = mask
-
         # needed for attention visualisation
         subwords = [tokenizer.convert_ids_to_tokens(i) for i in sn_input_ids]
 
-        sn_sp_emb, pos_enc, sn_input_ids_emb = model.get_embeds(
-            sn_sp_repr=sn_sp_repr,
-            sn_input_ids=sn_input_ids,
+        sn_sp_emb, pos_enc = model.get_embeds(
+            sn_sp_repr=sp_word_ids,
             indices_pos_enc=indices_pos_enc,
         )
 
         x_start = sn_sp_emb
         noise = torch.randn_like(x_start)
-        mask = torch.broadcast_to(mask.unsqueeze(dim=-1), x_start.shape).to(dist_util.dev())
 
         # replace the scan path with Gaussian noise
-        x_noised = torch.where(mask == 0, x_start, noise)
+        x_noised = noise
 
         if args.step == args.diffusion_steps:
             args.use_ddim = False
@@ -270,8 +254,7 @@ def main():
             model=model,
             shape=sample_shape,
             noise=x_noised,
-            sn_input_ids_emb=None,
-            pos_enc=None,
+            pos_enc=pos_enc,
             mask_sn_padding=None,
             mask_transformer_att=None,
             clip_denoised=args.clip_denoised,
@@ -280,8 +263,8 @@ def main():
             top_p=args.top_p,
             clamp_step=args.clamp_step,
             clamp_first=clamp_first_bool,
-            mask=mask,
-            x_start=x_start,
+            mask=None,
+            x_start=None,
             subwords_list=subwords,
             atten_vis=args.atten_vis,
             atten_vis_fn=attention_visualization,
@@ -302,34 +285,28 @@ def main():
         logits = model.get_logits(sample)
         cands = torch.topk(logits, k=1, dim=-1)
 
-        for instance_idx, (pred_seq, orig_words, orig_ids, sn_len, sn_id, reader_id) in enumerate(zip(
-                cands.indices, words_for_mapping, sn_sp_repr, sn_repr_len, sn_ids, reader_ids
+        for instance_idx, (pred_seq, orig_words, orig_ids, sn_id, reader_id) in enumerate(zip(
+                cands.indices, words_for_mapping, sp_word_ids, sn_ids, reader_ids
         )):
 
-            pred_seq_sp = pred_seq[sn_len:]
-            orig_ids_sp = orig_ids[sn_len:]
-
-            ### cut off all trailing PAD tokens ###
+            pred_seq_sp = pred_seq
+            orig_ids_sp = orig_ids
 
             words_split = orig_words.split()
-            # map the predicted indices to the words
             predicted_sp = [words_split[i] for i in pred_seq_sp]
-            # the predicted sp IDs
             pred_sp_ids = [e.item() for e in pred_seq_sp]
-            # original scan path in words
             original_sp = [words_split[i] for i in orig_ids_sp]
-            # the original sp IDs
             orig_sp_ids = [e.item() for e in orig_ids_sp]
 
-            ### cut off all trailing PAD tokens ###
+            # # # cut off all trailing PAD tokens # # #
 
             while len(predicted_sp) > 1 and predicted_sp[-1] == '[PAD]':
                 predicted_sp.pop()
-            while len(pred_sp_ids) > 1 and pred_sp_ids[-1] == args.seq_len-1:
+            while len(pred_sp_ids) > 1 and pred_sp_ids[-1] == args.seq_len - 1:
                 pred_sp_ids.pop()
             while len(original_sp) > 1 and original_sp[-1] == '[PAD]':
                 original_sp.pop()
-            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len-1:
+            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len - 1:
                 orig_sp_ids.pop()
             while len(words_split) > 1 and words_split[-1] == '[PAD]':
                 words_split.pop()
@@ -347,12 +324,8 @@ def main():
             original_sn_pad.append(' '.join(words_split))
 
             # add the IDs to the list
-            if args.inference == 'zuco':
-                reader_ids_pad.append(reader_id)
-                sn_ids_pad.append(sn_id.item())
-            else:
-                reader_ids_pad.append(reader_id.item())
-                sn_ids_pad.append(sn_id)
+            sn_ids_pad.append(sn_id)
+            reader_ids_pad.append(reader_id.item())
 
             if batch_idx == 0 and instance_idx == 0:
 
@@ -361,14 +334,8 @@ def main():
                 data_dict_initial_pad['predicted_sp_ids'].append(pred_sp_ids)
                 data_dict_initial_pad['original_sp_ids'].append(orig_sp_ids)
                 data_dict_initial_pad['original_sn'].append(' '.join(words_split))
-
-                if args.inference == 'zuco':
-                    data_dict_initial_pad['reader_ids'].append(reader_id)
-                    data_dict_initial_pad['sn_ids'].append(sn_id.item())
-                else:
-                    data_dict_initial_pad['reader_ids'].append(reader_id.item())
-                    data_dict_initial_pad['sn_ids'].append(sn_id)
-
+                data_dict_initial_pad['sn_ids'].append(sn_id)
+                data_dict_initial_pad['reader_ids'].append(reader_id.item())
                 for i in range(world_size):
                     if i == rank:
                         with open(out_path_incrementally_pad, 'w') as f:
@@ -388,13 +355,8 @@ def main():
                 loaded_data_dict['predicted_sp_ids'].append(pred_sp_ids)
                 loaded_data_dict['original_sp_ids'].append(orig_sp_ids)
                 loaded_data_dict['original_sn'].append(' '.join(words_split))
-
-                if args.inference == 'zuco':
-                    loaded_data_dict['reader_ids'].append(reader_id)
-                    loaded_data_dict['sn_ids'].append(sn_id.item())
-                else:
-                    loaded_data_dict['reader_ids'].append(reader_id.item())
-                    loaded_data_dict['sn_ids'].append(sn_id)
+                loaded_data_dict['sn_ids'].append(sn_id)
+                loaded_data_dict['reader_ids'].append(reader_id.item())
 
                 for i in range(world_size):
                     if i == rank:
@@ -402,8 +364,7 @@ def main():
                             json.dump(loaded_data_dict, f)
                     dist.barrier()
 
-
-            ### cut off at first SEP token ###
+            # # # cut off at first SEP token # # #
 
             words_split = orig_words.split()
             # map the predicted indices to the words
@@ -417,7 +378,7 @@ def main():
 
             while len(original_sp) > 1 and original_sp[-1] == '[PAD]':
                 original_sp.pop()
-            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len-1:
+            while len(orig_sp_ids) > 1 and orig_sp_ids[-1] == args.seq_len - 1:
                 orig_sp_ids.pop()
             while len(words_split) > 1 and words_split[-1] == '[PAD]':
                 words_split.pop()
@@ -425,12 +386,12 @@ def main():
 
             for idx, predicted_sp_id in enumerate(pred_sp_ids):
                 if predicted_sp_id == sep_token_id:
-                    pred_sp_ids = pred_sp_ids[:idx+1]
+                    pred_sp_ids = pred_sp_ids[:idx + 1]
                     break
 
             for idx, predicted_sp_word in enumerate(predicted_sp):
                 if predicted_sp_word == '[SEP]':
-                    predicted_sp = predicted_sp[:idx+1]
+                    predicted_sp = predicted_sp[:idx + 1]
                     break
 
             # predicted scan path in words
@@ -446,12 +407,8 @@ def main():
             original_sn_sep.append(' '.join(words_split))
 
             # add the IDs to the list
-            if args.inference == 'zuco':
-                reader_ids_sep.append(reader_id)
-                sn_ids_sep.append(sn_id.item())
-            else:
-                reader_ids_sep.append(reader_id.item())
-                sn_ids_sep.append(sn_id)
+            sn_ids_sep.append(sn_id)
+            reader_ids_sep.append(reader_ids)
 
             if batch_idx == 0 and instance_idx == 0:
 
@@ -460,13 +417,8 @@ def main():
                 data_dict_initial_sep['predicted_sp_ids'].append(pred_sp_ids)
                 data_dict_initial_sep['original_sp_ids'].append(orig_sp_ids)
                 data_dict_initial_sep['original_sn'].append(' '.join(words_split))
-
-                if args.inference == 'zuco':
-                    data_dict_initial_sep['reader_ids'].append(reader_id)
-                    data_dict_initial_sep['sn_ids'].append(sn_id.item())
-                else:
-                    data_dict_initial_sep['reader_ids'].append(reader_id.item())
-                    data_dict_initial_sep['sn_ids'].append(sn_id)
+                data_dict_initial_sep['sn_ids'].append(sn_id)
+                data_dict_initial_sep['reader_ids'].append(reader_id.item())
 
                 for i in range(world_size):
                     if i == rank:
@@ -487,13 +439,8 @@ def main():
                 loaded_data_dict['predicted_sp_ids'].append(pred_sp_ids)
                 loaded_data_dict['original_sp_ids'].append(orig_sp_ids)
                 loaded_data_dict['original_sn'].append(' '.join(words_split))
-
-                if args.inference == 'zuco':
-                    loaded_data_dict['reader_ids'].append(reader_id)
-                    loaded_data_dict['sn_ids'].append(sn_id.item())
-                else:
-                    loaded_data_dict['reader_ids'].append(reader_id.item())
-                    loaded_data_dict['sn_ids'].append(sn_id)
+                loaded_data_dict['sn_ids'].append(sn_id)
+                loaded_data_dict['reader_ids'].append(reader_id.item())
 
                 for i in range(world_size):
                     if i == rank:
@@ -502,11 +449,9 @@ def main():
                     dist.barrier()
 
         del batch
-        del mask
-        del sn_sp_repr
+        del sp_word_ids
         del sn_input_ids
         del indices_pos_enc
-        del sn_repr_len
         del words_for_mapping
         del x_start
         del noise

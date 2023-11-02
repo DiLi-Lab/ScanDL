@@ -10,23 +10,24 @@ import wandb
 
 import torch.distributed as dist
 from sklearn.model_selection import train_test_split
-from transformers import set_seed, BertTokenizerFast, BertConfig
+from transformers import set_seed, BertTokenizerFast
 
 from scandl.utils import dist_util, logger
 from scandl.step_sample import create_named_schedule_sampler
-from sp_basic_utils_ablation_no_condition import (
+from scripts.sp_basic_utils_ablation_no_condition import (
     load_defaults_config,
     create_model_and_diffusion,
     args_to_dict,
     add_dict_to_argparser,
 )
-from sp_train_util_ablation_no_condition import TrainLoop
-from sp_load_celer_zuco_ablation_no_condition import load_celer, load_celer_speakers, process_celer, celer_zuco_dataset_and_loader
-from sp_load_celer_zuco_ablation_no_condition import  get_kfold, get_kfold_indices_combined
-from sp_load_celer_zuco_ablation_no_condition import flatten_data, unflatten_data
+from scripts.sp_train_util_ablation_no_condition import TrainLoop
+from scripts.sp_load_celer_zuco_ablation_no_condition import load_celer, load_celer_speakers, process_celer, celer_zuco_dataset_and_loader
+from scripts.sp_load_celer_zuco_ablation_no_condition import get_kfold, get_kfold_indices_combined
+from scripts.sp_load_celer_zuco_ablation_no_condition import flatten_data, unflatten_data
 
 
 os.environ["WANDB_MODE"] = "offline"
+
 
 def create_argparser():
     """ Loads the config from the file scandl/config.json and adds all keys and values in the config dict
@@ -49,7 +50,6 @@ def main():
     logger.configure()
     logger.log("### Creating data loader...")
 
-    world_size = dist.get_world_size() or 1  # the number of processes in the current process group
     rank = dist.get_rank() or 0
 
     tokenizer = BertTokenizerFast.from_pretrained(args.config_name)
@@ -63,8 +63,6 @@ def main():
     if args.inference != 'cv':
 
         raise NotImplementedError('This ablation case runs in the cross-validation setting of New Reader/New Sentence')
-
-
 
     else:  # performing k-fold cross-validation (New Reader, New Sentence, New Reader/New Sentence)
 
@@ -190,7 +188,6 @@ def main():
                         eval_interval=args.eval_interval,
                     ).run_loop()
 
-
             else:
 
                 reader_indices, sentence_indices = get_kfold_indices_combined(
@@ -303,6 +300,5 @@ def main():
                     ).run_loop()
 
 
-
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

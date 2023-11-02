@@ -90,7 +90,7 @@ if __name__ == '__main__':
             os.makedirs(model_file)
 
     COMMANDLINE = f'TOKENIZERS_PARALLELISM=FALSE ' \
-                  f'python sp_train_ablation_no_condition.py ' \
+                  f'python -m scripts.sp_train_ablation_no_condition ' \
                   f'--checkpoint_path {model_file} ' \
                   f'--vocab {args.vocab} ' \
                   f'--use_plm_init {args.use_plm_init} ' \

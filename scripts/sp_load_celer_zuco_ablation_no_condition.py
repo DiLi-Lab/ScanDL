@@ -8,14 +8,15 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from datasets import Dataset as Dataset2
 import datasets
+import CONSTANTS as C
 from sklearn.model_selection import train_test_split, GroupShuffleSplit, KFold, GroupKFold, StratifiedKFold
 from typing import Optional, List, Tuple, Union, Any, Dict
 from itertools import product
 
 
 def load_celer():
-    path_to_fix = '/srv/scratch1/bolliger/celer/data_v2.0/data_v2.0/sent_fix.tsv'
-    path_to_ia = '/srv/scratch1/bolliger/celer/data_v2.0/data_v2.0/sent_ia.tsv'
+    path_to_fix = C.PATH_TO_FIX
+    path_to_ia = C.PATH_TO_IA
     eyemovement_df = pd.read_csv(path_to_fix, delimiter='\t')
     eyemovement_df['CURRENT_FIX_INTEREST_AREA_LABEL'] = eyemovement_df.CURRENT_FIX_INTEREST_AREA_LABEL.replace('\t(.*)',
                                                                                                                '',
@@ -26,7 +27,7 @@ def load_celer():
 
 
 def load_celer_speakers(only_native_speakers: bool = True):
-    sub_metadata_path = '/srv/scratch1/bolliger/celer/participant_metadata/metadata.tsv'
+    sub_metadata_path = C.SUB_METADATA_PATH
     sub_info = pd.read_csv(sub_metadata_path, delimiter='\t')
     if only_native_speakers:
         readers_list = sub_info[sub_info.L1 == 'English'].List.values
@@ -75,20 +76,9 @@ def process_celer_orig(
     :param tokenizer: the BERT Tokenizer
     :param cf: the config dictionary
     """
-    SN = []
-    SN_mask = []
-    SN_len = []
-    SP_token = []
-    SP_token_mask = []
     SP_ordinal_pos = []
     SP_landing_pos = []
     SP_fix_dur = []
-    SP_len = []
-    WORD_ids_sn = []
-    WORD_ids_sp = []
-    sub_id_list = []
-    SN_WORD_len = []
-    SN_WORD_freq = []
 
     data = {
         'input_ids_sn': list(),
@@ -103,7 +93,6 @@ def process_celer_orig(
             if sn_id_idx == subset_size:
                 break
 
-
         # subset the fixations report DF to a DF containing only the current sentence/text ID (each sentence appears multiple times)
         sn_df = eyemovement_df[eyemovement_df.sentenceid == sn_id]
         # notice: Each sentence is recorded multiple times in file |word_info_df|.
@@ -112,13 +101,6 @@ def process_celer_orig(
         # sn is a dataframe containing only one sentence (the sentence with the current sentence ID)
         sn = sn[
             sn['list'] == sn.list.values.tolist()[0]]  # list = experimental list number (unique to each participant).
-        # compute word length and frequency features for each word
-        sn_word_len = compute_word_length(sn.WORD_LEN.values)
-        sn_word_freq = compute_word_frequency(
-            sn.FREQ_BLLIP.values)  # FREQ-BLLIP -log2(word frequency) in BLLIP (Charniak et al. 2000).
-        # BLLIP vocabulary size: 229,538 words.
-        # so FREQ_BLLIP are already logs of word frequencies
-        # why do we log_10 them again in compute_word_frequency()
         sn_str = sn.sentence.iloc[-1]  # the whole sentence as string
         if sn_id == '1987/w7_019/w7_019.295-3' or sn_id == '1987/w7_036/w7_036.147-43' or sn_id == '1987/w7_091/w7_091.360-6':
             # extra inverted commas at the end of the sentence
@@ -181,17 +163,15 @@ def process_celer_orig(
                         merge_flag = True
 
                     else:
-                        if outlier_i - 1 >= 0 and merge_flag == False:
+                        if outlier_i - 1 >= 0 and not merge_flag:
                             # try to merge with the left fixation if they landed both on the same interest area
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i - 1] = sp_fix_dur[outlier_i - 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
-                        if outlier_i + 1 < len(sp_fix_dur) and merge_flag == False:
+                        if outlier_i + 1 < len(sp_fix_dur) and not merge_flag:
                             # try to merge with the right fixation
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i + 1] = sp_fix_dur[outlier_i + 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
@@ -364,8 +344,6 @@ def process_celer_orig(
             test_data_dict['test'] = test_dataset
             return train_data_dict, test_data_dict
 
-
-
         elif split == 'train-val':
 
             train_data, val_data = train_test_split(flattened_data, test_size=0.1, shuffle=True, random_state=77)
@@ -433,7 +411,6 @@ def process_celer_orig(
             return train_data_dict, test_data_dict, val_data_dict
 
 
-
 def _collate_instance_helper(
         instance,
         pad_token_id,
@@ -442,7 +419,6 @@ def _collate_instance_helper(
     padding_list = [pad_token_id] * padding_steps
     result = instance + padding_list
     return result
-
 
 
 def _collate_batch_helper(
@@ -469,9 +445,8 @@ def _dummy_pad_words(
 ):
     padded_examples = list()
     for instance in examples:
-        padded_examples.append(instance + (max_length-len(instance)) * [pad_token_id])
+        padded_examples.append(instance + (max_length - len(instance)) * [pad_token_id])
     return padded_examples
-
 
 
 class CelerDatasetOrig(Dataset):
@@ -580,23 +555,23 @@ def process_celer_leak(
         'sp_repr': list(),   # the fixation position IDs
         'sn_word_ids': list(),  # the word IDs, including CLS (0) and SEP (len(sn)+1)
         'sp_word_ids': list(),  # again the fixation position IDs, including CLS(0) and SEP (len(sn)+1) for a
-                                # word ID embedding that aligns sn with sp
+        # word ID embedding that aligns sn with sp
         'combined_word_ids': list(),
         'sn_repr_len': list(),  # holds the length of the individual sentences, in tokens including CLS and SEP,
-                                # so they can be cut off and concatenated with sp repr before being fed into the model
+        # so they can be cut off and concatenated with sp repr before being fed into the model
         'combined_sn_sp_indices': list(),
         'words_for_mapping': list(),  # will hold the words that the IDs map to at inference time
-    #    'reader_ID': list(),  # holds the reader ID for a stratified split
-    #    'sn_ID': list(),  # holds the sentence ID for a stratified split
-    #    'combined_reader_sn_ID': list(),  # holds the combination of sentence and reader ID for a split of both new
-                                            # readers and new sentences
+        # 'reader_ID': list(),  # holds the reader ID for a stratified split
+        # 'sn_ID': list(),  # holds the sentence ID for a stratified split
+        # 'combined_reader_sn_ID': list(),  # holds the combination of sentence and reader ID for a split of both new
+        # readers and new sentences
     }
     reader_IDs, sn_IDs, combined_reader_sn_IDs = list(), list(), list()
 
     for sn_id_idx, sn_id in tqdm(enumerate(sn_list)):  # for text/sentence ID
 
         if subset_size is not None:
-            if sn_id_idx == subset_size+1:
+            if sn_id_idx == subset_size + 1:
                 break
 
         # subset the fixations report DF to a DF containing only the current sentence/text ID (each sentence appears multiple times)
@@ -608,9 +583,6 @@ def process_celer_leak(
         sn = sn[
             sn['list'] == sn.list.values.tolist()[0]]  # list = experimental list number (unique to each participant).
         # compute word length and frequency features for each word
-        sn_word_len = compute_word_length(sn.WORD_LEN.values)
-        sn_word_freq = compute_word_frequency(
-            sn.FREQ_BLLIP.values)  # FREQ-BLLIP -log2(word frequency) in BLLIP (Charniak et al. 2000).
         # BLLIP vocabulary size: 229,538 words.
         # so FREQ_BLLIP are already logs of word frequencies
         # why do we log_10 them again in compute_word_frequency()
@@ -627,8 +599,6 @@ def process_celer_leak(
             continue
 
         sn_len = len(sn_str.split())
-
-        sn_split = sn_str.split()
 
         # add CLS and SEP 'manually' to the sentence so that they receive the word IDs 0 and len(sn)+1
         sn_str = '[CLS] ' + sn_str + ' [SEP]'
@@ -666,17 +636,15 @@ def process_celer_leak(
                         merge_flag = True
 
                     else:
-                        if outlier_i - 1 >= 0 and merge_flag == False:
+                        if outlier_i - 1 >= 0 and not merge_flag:
                             # try to merge with the left fixation if they landed both on the same interest area
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i - 1] = sp_fix_dur[outlier_i - 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
-                        if outlier_i + 1 < len(sp_fix_dur) and merge_flag == False:
+                        if outlier_i + 1 < len(sp_fix_dur) and not merge_flag:
                             # try to merge with the right fixation
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i + 1] = sp_fix_dur[outlier_i + 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
@@ -713,7 +681,6 @@ def process_celer_leak(
                     else:
                         print('Landing position calculation error. Unknown cause, needs to be checked')
             SP_landing_pos.append(sp_fix_loc)
-
 
             encoded_sn = tokenizer.encode_plus(
                 sn_str.split(),
@@ -793,9 +760,9 @@ def process_celer_leak(
             data['words_for_mapping'].append(' '.join(words_for_mapping))
 
             # add the reader and sn IDs
-          #  data['reader_ID'].append(sub_id)
-          #  data['sn_ID'].append(sn_id)
-          #  data['combined_reader_sn_ID'].append((sub_id, sn_id))
+            #  data['reader_ID'].append(sub_id)
+            #  data['sn_ID'].append(sn_id)
+            #  data['combined_reader_sn_ID'].append((sub_id, sn_id))
             reader_IDs.append(sub_id)
             sn_IDs.append(sn_id)
             combined_reader_sn_IDs.append((sub_id, sn_id))
@@ -818,19 +785,19 @@ def process_celer_leak(
     # pad the sp repr, which is the fixation interest area indices (indices of words in sn) with last possible word idx
     data['sp_repr'] = _collate_batch_helper(
         examples=data['sp_repr'],
-        pad_token_id=args.seq_len-1,
+        pad_token_id=args.seq_len - 1,
         max_length=args.seq_len,
     )
     # pad the combined input IDs also with the last possible word idx
     data['combined_word_ids'] = _collate_batch_helper(
         examples=data['combined_word_ids'],
-        pad_token_id=args.seq_len-1,
+        pad_token_id=args.seq_len - 1,
         max_length=args.seq_len,
     )
     # pad the indicces
     data['combined_sn_sp_indices'] = _collate_batch_helper(
         examples=data['combined_sn_sp_indices'],
-        pad_token_id=args.seq_len-1,
+        pad_token_id=args.seq_len - 1,
         max_length=args.seq_len,
     )
     # pad the mask
@@ -851,7 +818,7 @@ def process_celer_leak(
     # TODO the following section with the datasets and data splitting is ugly --> maybe change
 
     if split == 'train':
-        
+
         dataset = Dataset2.from_dict(data)
         train_dataset = datasets.DatasetDict()
         train_dataset['train'] = dataset
@@ -873,9 +840,9 @@ def process_celer_leak(
                     data['sn_repr_len'][i],
                     data['combined_sn_sp_indices'][i],
                     data['words_for_mapping'][i],
-                 #   data['reader_ID'][i],
-                 #   data['sn_ID'][i],
-                 #   data['combined_reader_sn_ID'][i],
+                    # data['reader_ID'][i],
+                    # data['sn_ID'][i],
+                    # data['combined_reader_sn_ID'][i],
                 )
             )
 
@@ -918,9 +885,9 @@ def process_celer_leak(
                     'sn_repr_len': [instance[6] for instance in train_data],
                     'combined_sn_sp_indices': [instance[7] for instance in train_data],
                     'words_for_mapping': [instance[8] for instance in train_data],
-                 #   'reader_ID': [instance[9] for instance in train_data],
-                 #   'sn_ID': [instance[10] for instance in train_data],
-                 #   'combined_reader_sn_ID': [instance[11] for instance in train_data],
+                    # 'reader_ID': [instance[9] for instance in train_data],
+                    # 'sn_ID': [instance[10] for instance in train_data],
+                    # 'combined_reader_sn_ID': [instance[11] for instance in train_data],
                 }
             )
             test_dataset = Dataset2.from_dict(
@@ -934,9 +901,9 @@ def process_celer_leak(
                     'sn_repr_len': [instance[6] for instance in test_data],
                     'combined_sn_sp_indices': [instance[7] for instance in test_data],
                     'words_for_mapping': [instance[8] for instance in test_data],
-                 #   'reader_ID': [instance[9] for instance in test_data],
-                 #   'sn_ID': [instance[10] for instance in test_data],
-                 #   'combined_reader_sn_ID': [instance[11] for instance in test_data],
+                    # 'reader_ID': [instance[9] for instance in test_data],
+                    # 'sn_ID': [instance[10] for instance in test_data],
+                    # 'combined_reader_sn_ID': [instance[11] for instance in test_data],
                 }
             )
             train_data_dict = datasets.DatasetDict()
@@ -981,9 +948,9 @@ def process_celer_leak(
                     'sn_repr_len': [instance[6] for instance in train_data],
                     'combined_sn_sp_indices': [instance[7] for instance in train_data],
                     'words_for_mapping': [instance[8] for instance in train_data],
-                 #   'reader_ID': [instance[9] for instance in train_data],
-                 #   'sn_ID': [instance[10] for instance in train_data],
-                 #   'combined_reader_sn_ID': [instance[11] for instance in train_data],
+                    # 'reader_ID': [instance[9] for instance in train_data],
+                    # 'sn_ID': [instance[10] for instance in train_data],
+                    # 'combined_reader_sn_ID': [instance[11] for instance in train_data],
                 }
             )
             val_dataset = Dataset2.from_dict(
@@ -997,9 +964,9 @@ def process_celer_leak(
                     'sn_repr_len': [instance[6] for instance in val_data],
                     'combined_sn_sp_indices': [instance[7] for instance in val_data],
                     'words_for_mapping': [instance[8] for instance in val_data],
-                 #   'reader_ID': [instance[9] for instance in val_data],
-                 #   'sn_ID': [instance[10] for instance in val_data],
-                 #   'combined_reader_sn_ID': [instance[11] for instance in val_data],
+                    # 'reader_ID': [instance[9] for instance in val_data],
+                    # 'sn_ID': [instance[10] for instance in val_data],
+                    # 'combined_reader_sn_ID': [instance[11] for instance in val_data],
                 }
             )
             train_data_dict = datasets.DatasetDict()
@@ -1048,7 +1015,6 @@ def process_celer_leak(
                         val_data = np.array(train_data)[val_index].tolist()
                         train_data = np.array(train_data)[train_index].tolist()
 
-
             else:
                 train_data, test_data = train_test_split(flattened_data, test_size=test_size, shuffle=True, random_state=77)
                 train_data, val_data = train_test_split(train_data, test_size=val_size, shuffle=True, random_state=77)
@@ -1065,9 +1031,9 @@ def process_celer_leak(
                     'sn_repr_len': [instance[6] for instance in train_data],
                     'combined_sn_sp_indices': [instance[7] for instance in train_data],
                     'words_for_mapping': [instance[8] for instance in train_data],
-                 #   'reader_ID': [instance[9] for instance in train_data],
-                 #   'sn_ID': [instance[10] for instance in train_data],
-                 #   'combined_reader_sn_ID': [instance[11] for instance in train_data],
+                    # 'reader_ID': [instance[9] for instance in train_data],
+                    # 'sn_ID': [instance[10] for instance in train_data],
+                    # 'combined_reader_sn_ID': [instance[11] for instance in train_data],
                 }
             )
             test_dataset = Dataset2.from_dict(
@@ -1081,9 +1047,9 @@ def process_celer_leak(
                     'sn_repr_len': [instance[6] for instance in test_data],
                     'combined_sn_sp_indices': [instance[7] for instance in test_data],
                     'words_for_mapping': [instance[8] for instance in test_data],
-                 #   'reader_ID': [instance[9] for instance in test_data],
-                 #   'sn_ID': [instance[10] for instance in test_data],
-                 #   'combined_reader_sn_ID': [instance[11] for instance in test_data],
+                    # 'reader_ID': [instance[9] for instance in test_data],
+                    # 'sn_ID': [instance[10] for instance in test_data],
+                    # 'combined_reader_sn_ID': [instance[11] for instance in test_data],
                 }
             )
             val_dataset = Dataset2.from_dict(
@@ -1097,9 +1063,9 @@ def process_celer_leak(
                     'sn_repr_len': [instance[6] for instance in val_data],
                     'combined_sn_sp_indices': [instance[7] for instance in val_data],
                     'words_for_mapping': [instance[8] for instance in val_data],
-                 #   'reader_ID': [instance[9] for instance in val_data],
-                 #   'sn_ID': [instance[10] for instance in val_data],
-                 #   'combined_reader_sn_ID': [instance[11] for instance in val_data],
+                    # 'reader_ID': [instance[9] for instance in val_data],
+                    # 'sn_ID': [instance[10] for instance in val_data],
+                    # 'combined_reader_sn_ID': [instance[11] for instance in val_data],
                 }
             )
             train_data_dict = datasets.DatasetDict()
@@ -1131,9 +1097,9 @@ class CelerZucoDatasetLeak(Dataset):
     def __getitem__(self, idx):
         sample = {
             'sn_repr': np.array(self.dataset[self.split][idx]['sn_repr']),
-        #    'sn_word_ids': np.array(self.dataset[self.split][idx]['sn_word_ids']),
+            #    'sn_word_ids': np.array(self.dataset[self.split][idx]['sn_word_ids']),
             'sp_repr': np.array(self.dataset[self.split][idx]['sp_repr']),
-        #    'sp_word_ids': np.array(self.dataset[self.split][idx]['sp_word_ids']),
+            #    'sp_word_ids': np.array(self.dataset[self.split][idx]['sp_word_ids']),
             'mask': np.array(self.dataset[self.split][idx]['mask']),
             'combined_word_ids': np.array(self.dataset[self.split][idx]['combined_word_ids']),
             'sn_repr_len': np.array(self.dataset[self.split][idx]['sn_repr_len']),
@@ -1150,7 +1116,7 @@ def celer_zuco_dataset_and_loader(
         deterministic=False,
         loop=True,
 ):
-    
+
     # dataset = CelerZucoDatasetLeak(
     #     dataset=data,
     #     data_args=data_args,
@@ -1269,9 +1235,8 @@ def combined_split(data, reader_IDs, sn_IDs, test_size):
     return train_data, test_data, train_reader_IDs, test_reader_IDs, train_sn_IDs, test_sn_IDs
 
 
-
-def load_zuco(task: str=None): # 'zuco11', 'zuco12'
-    dir = '/srv/scratch1/bolliger/'
+def load_zuco(task: str = None):  # 'zuco11', 'zuco12'
+    dir = C.path_to_zuco
     if task.startswith('zuco1'):
         dir = dir + 'zuco/'
     elif task == 'zuco21':
@@ -1335,7 +1300,7 @@ def process_zuco_leak(
     for sn_id_idx, sn_id in tqdm(enumerate(sn_list)):
 
         if subset_size is not None:
-            if sn_id_idx == subset_size+1:
+            if sn_id_idx == subset_size + 1:
                 break
 
         sn_df = eyemovement_df[eyemovement_df.sn == sn_id]
@@ -1364,17 +1329,15 @@ def process_zuco_leak(
                 for out_idx in range(len(outlier_indx)):
                     outlier_i = outlier_indx[out_idx]
                     merge_flag = False
-                    if outlier_i - 1 >= 0 and merge_flag == False:
+                    if outlier_i - 1 >= 0 and not merge_flag:
                         # try to merge with the left fixation
-                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                            outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                             sp_fix_dur[outlier_i - 1] = sp_fix_dur[outlier_i - 1] + sp_fix_dur[outlier_i]
                             merge_flag = True
 
-                    if outlier_i + 1 < len(sp_fix_dur) and merge_flag == False:
+                    if outlier_i + 1 < len(sp_fix_dur) and not merge_flag:
                         # try to merge with the right fixation
-                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                            outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                             sp_fix_dur[outlier_i + 1] = sp_fix_dur[outlier_i + 1] + sp_fix_dur[outlier_i]
                             merge_flag = True
 
@@ -1403,7 +1366,6 @@ def process_zuco_leak(
             sp_fix_loc = [float(i) if isinstance(i, int) or isinstance(i, float) else np.nan for i in sp_fix_loc if
                           isinstance(i, int) or isinstance(i, float)]
             SP_landing_pos.append(sp_fix_loc)
-
 
             # encode the sentence
             encoded_sn = tokenizer.encode_plus(
@@ -1721,7 +1683,6 @@ def process_zuco_leak(
                         val_data = np.array(train_data)[val_index].tolist()
                         train_data = np.array(train_data)[train_index].tolist()
 
-
             else:
                 train_data, test_data = train_test_split(flattened_data, test_size=test_size, shuffle=True,
                                                          random_state=77)
@@ -1801,7 +1762,7 @@ def get_kfold_indices_scanpath(
 
     # list of indices of the sn-reader pairs of unique sentences
     unique_sns_ids = [idx for (idx, reader_ID, sn_ID) in tuple_ids if not sn_ID.startswith('en')]
-  #  unique_sns_indices = {sn_ID: idx for (idx, reader_ID, sn_ID) in tuple_ids if not sn_ID.startswith('en')}
+    # unique_sns_indices = {sn_ID: idx for (idx, reader_ID, sn_ID) in tuple_ids if not sn_ID.startswith('en')}
     universal_sn_ids = [idx for (idx, reader_ID, sn_ID) in tuple_ids if sn_ID.startswith('en')]
 
     # get the reader IDs for the unique and universal sns
@@ -1923,15 +1884,15 @@ def flatten_data(data: Dict[str, List[Any]]):
     for i in range(len(data['sp_word_ids'])):
         flattened_data.append(
             (
-            #    data['mask'][i],
-            #    data['sn_sp_repr'][i],
+                #    data['mask'][i],
+                #    data['sn_sp_repr'][i],
                 data['sn_word_ids'][i],
                 data['sp_word_ids'][i],
                 data['sn_input_ids'][i],
                 data['indices_pos_enc'][i],
                 data['sn_repr_len'][i],
                 data['words_for_mapping'][i],
-            #    data['mask_sn_padding'][i],
+                #    data['mask_sn_padding'][i],
                 data['mask_transformer_att'][i],
                 data['sn_ids'][i],
                 data['reader_ids'][i],
@@ -1943,15 +1904,15 @@ def flatten_data(data: Dict[str, List[Any]]):
 def unflatten_data(flattened_data: List[Tuple[Any]], split: str):
     dataset = Dataset2.from_dict(
         {
-        #    'mask': [instance[0] for instance in flattened_data],
-        #    'sn_sp_repr': [instance[1] for instance in flattened_data],
+            #    'mask': [instance[0] for instance in flattened_data],
+            #    'sn_sp_repr': [instance[1] for instance in flattened_data],
             'sn_word_ids': [instance[0] for instance in flattened_data],
             'sp_word_ids': [instance[1] for instance in flattened_data],
             'sn_input_ids': [instance[2] for instance in flattened_data],
             'indices_pos_enc': [instance[3] for instance in flattened_data],
             'sn_repr_len': [instance[4] for instance in flattened_data],
             'words_for_mapping': [instance[5] for instance in flattened_data],
-        #    'mask_sn_padding': [instance[6] for instance in flattened_data],
+            #    'mask_sn_padding': [instance[6] for instance in flattened_data],
             'mask_transformer_att': [instance[6] for instance in flattened_data],
             'sn_ids': [instance[7] for instance in flattened_data],
             'reader_ids': [instance[8] for instance in flattened_data],
@@ -1997,16 +1958,15 @@ def process_celer(
     SP_fix_dur = []
 
     data = {
-     #   'mask': list(),  # 0 for sn, 1 for sp
-   #     'sn_sp_repr': list(),  # word IDs of sn and corresponding word IDs of sp (fixated words, interest area IDs),
-                                # padded with args.seq_len -1
+        # 'mask': list(),  # 0 for sn, 1 for sp
+        # 'sn_sp_repr': list(),  # word IDs of sn and corresponding word IDs of sp (fixated words, interest area IDs) padded with args.seq_len -1
         'sn_word_ids': list(),
         'sp_word_ids': list(),
         'sn_input_ids': list(),  # input IDs of tokenized sentence, padded with pad token ID
         'indices_pos_enc': list(),  # indices from 1 ... len(sn input ids) 1 ... (seq_len - len(sn input ids))
-        'sn_repr_len': list(), # length of sentence in subword tokens
+        'sn_repr_len': list(),  # length of sentence in subword tokens
         'words_for_mapping': list(),   # original words of sentence, padded with PAD
-    #    'mask_sn_padding': list(),  # masks both the sentence and the padding, for the loss computations
+        #    'mask_sn_padding': list(),  # masks both the sentence and the padding, for the loss computations
         'mask_transformer_att': list(),  # masks only the padding, for the transformer attention
         'sn_ids': list(),
         'reader_ids': list(),
@@ -2019,7 +1979,7 @@ def process_celer(
     for sn_id_idx, sn_id in tqdm(enumerate(sn_list)):  # for text/sentence ID
 
         if subset_size is not None:
-            if sn_id_idx == subset_size+1:
+            if sn_id_idx == subset_size + 1:
                 break
 
         # subset the fixations report DF to a DF containing only the current sentence/text ID (each sentence appears multiple times)
@@ -2031,9 +1991,6 @@ def process_celer(
         sn = sn[
             sn['list'] == sn.list.values.tolist()[0]]  # list = experimental list number (unique to each participant).
         # compute word length and frequency features for each word
-        sn_word_len = compute_word_length(sn.WORD_LEN.values)
-        sn_word_freq = compute_word_frequency(
-            sn.FREQ_BLLIP.values)  # FREQ-BLLIP -log2(word frequency) in BLLIP (Charniak et al. 2000).
         # BLLIP vocabulary size: 229,538 words.
         # so FREQ_BLLIP are already logs of word frequencies
         # why do we log_10 them again in compute_word_frequency()
@@ -2050,8 +2007,6 @@ def process_celer(
             continue
 
         sn_len = len(sn_str.split())
-
-        sn_split = sn_str.split()
 
         # add CLS and SEP 'manually' to the sentence so that they receive the word IDs 0 and len(sn)+1
         sn_str = '[CLS] ' + sn_str + ' [SEP]'
@@ -2089,17 +2044,15 @@ def process_celer(
                         merge_flag = True
 
                     else:
-                        if outlier_i - 1 >= 0 and merge_flag == False:
+                        if outlier_i - 1 >= 0 and not merge_flag:
                             # try to merge with the left fixation if they landed both on the same interest area
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i - 1] = sp_fix_dur[outlier_i - 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
-                        if outlier_i + 1 < len(sp_fix_dur) and merge_flag == False:
+                        if outlier_i + 1 < len(sp_fix_dur) and not merge_flag:
                             # try to merge with the right fixation
-                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                                outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                            if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                                 sp_fix_dur[outlier_i + 1] = sp_fix_dur[outlier_i + 1] + sp_fix_dur[outlier_i]
                                 merge_flag = True
 
@@ -2136,7 +2089,6 @@ def process_celer(
                     else:
                         print('Landing position calculation error. Unknown cause, needs to be checked')
             SP_landing_pos.append(sp_fix_loc)
-
 
             encoded_sn = tokenizer.encode_plus(
                 sn_str.split(),
@@ -2183,27 +2135,27 @@ def process_celer(
             sp_word_ids.append(sep_token_sp_word_ids)
             sn_input_ids.append(sep_token_sn_input_ids)
 
-         #   sn_sp_repr = sn_word_ids + sp_word_ids
+            #   sn_sp_repr = sn_word_ids + sp_word_ids
 
-         #   mask = [0] * len(sn_word_ids)
-         #   mask_sn_padding = [0] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (args.seq_len - len(sn_word_ids) - len(sp_word_ids))
+            #   mask = [0] * len(sn_word_ids)
+            #   mask_sn_padding = [0] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (args.seq_len - len(sn_word_ids) - len(sp_word_ids))
             mask_transformer_att = [1] * len(sp_word_ids) + [0] * (args.seq_len - len(sp_word_ids))
 
-        #    indices_pos_enc = list(range(0, len(sn_word_ids))) + list(range(0, args.seq_len - len(sn_word_ids)))
+            #    indices_pos_enc = list(range(0, len(sn_word_ids))) + list(range(0, args.seq_len - len(sn_word_ids)))
             indices_pos_enc = list(range(0, args.seq_len))
 
             sn_repr_len = len(sn_word_ids)
             words_for_mapping = sn_str.split() + (args.seq_len - len(sn_str.split())) * ['[PAD]']
 
-        #    data['mask'].append(mask)
-        #    data['sn_sp_repr'].append(sn_sp_repr)
+            #    data['mask'].append(mask)
+            #    data['sn_sp_repr'].append(sn_sp_repr)
             data['sn_word_ids'].append(sn_word_ids)
             data['sp_word_ids'].append(sp_word_ids)
             data['sn_input_ids'].append(sn_input_ids)
             data['indices_pos_enc'].append(indices_pos_enc)
             data['sn_repr_len'].append(sn_repr_len)
             data['words_for_mapping'].append(' '.join(words_for_mapping))
-       #     data['mask_sn_padding'].append(mask_sn_padding)
+            #     data['mask_sn_padding'].append(mask_sn_padding)
             data['mask_transformer_att'].append(mask_transformer_att)
             data['sn_ids'].append(sn_id)
             data['reader_ids'].append(sub_id)
@@ -2224,12 +2176,12 @@ def process_celer(
     # )
     data['sp_word_ids'] = _collate_batch_helper(
         examples=data['sp_word_ids'],
-        pad_token_id=args.seq_len-1,
+        pad_token_id=args.seq_len - 1,
         max_length=args.seq_len,
     )
     data['sn_word_ids'] = _collate_batch_helper(
         examples=data['sn_word_ids'],
-        pad_token_id=args.seq_len-1,
+        pad_token_id=args.seq_len - 1,
         max_length=args.seq_len,
     )
     data['sn_input_ids'] = _collate_batch_helper(
@@ -2512,15 +2464,15 @@ class CelerZucoDataset(Dataset):
 
     def __getitem__(self, idx):
         sample = {
-        #    'mask': np.array(self.dataset[self.split][idx]['mask']),
-        #    'sn_sp_repr': np.array(self.dataset[self.split][idx]['sn_sp_repr']),
+            #    'mask': np.array(self.dataset[self.split][idx]['mask']),
+            #    'sn_sp_repr': np.array(self.dataset[self.split][idx]['sn_sp_repr']),
             'sn_word_ids': np.array(self.dataset[self.split][idx]['sn_word_ids']),
             'sp_word_ids': np.array(self.dataset[self.split][idx]['sp_word_ids']),
             'sn_input_ids': np.array(self.dataset[self.split][idx]['sn_input_ids']),
             'indices_pos_enc': np.array(self.dataset[self.split][idx]['indices_pos_enc']),
             'sn_repr_len': np.array(self.dataset[self.split][idx]['sn_repr_len']),
             'words_for_mapping': self.dataset[self.split][idx]['words_for_mapping'],
-        #    'mask_sn_padding': np.array(self.dataset[self.split][idx]['mask_sn_padding']),
+            #    'mask_sn_padding': np.array(self.dataset[self.split][idx]['mask_sn_padding']),
             'mask_transformer_att': np.array(self.dataset[self.split][idx]['mask_transformer_att']),
             'sn_ids': self.dataset[self.split][idx]['sn_ids'],
             'reader_ids': self.dataset[self.split][idx]['reader_ids'],
@@ -2609,17 +2561,15 @@ def process_zuco(
                 for out_idx in range(len(outlier_indx)):
                     outlier_i = outlier_indx[out_idx]
                     merge_flag = False
-                    if outlier_i - 1 >= 0 and merge_flag == False:
+                    if outlier_i - 1 >= 0 and not merge_flag:
                         # try to merge with the left fixation
-                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                            outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i - 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                             sp_fix_dur[outlier_i - 1] = sp_fix_dur[outlier_i - 1] + sp_fix_dur[outlier_i]
                             merge_flag = True
 
-                    if outlier_i + 1 < len(sp_fix_dur) and merge_flag == False:
+                    if outlier_i + 1 < len(sp_fix_dur) and not merge_flag:
                         # try to merge with the right fixation
-                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[
-                            outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
+                        if sub_df.iloc[outlier_i].CURRENT_FIX_INTEREST_AREA_LABEL == sub_df.iloc[outlier_i + 1].CURRENT_FIX_INTEREST_AREA_LABEL:
                             sp_fix_dur[outlier_i + 1] = sp_fix_dur[outlier_i + 1] + sp_fix_dur[outlier_i]
                             merge_flag = True
 
@@ -2666,7 +2616,7 @@ def process_zuco(
             assert len(sn_word_ids) == len(sn_input_ids)
 
             max_len = max(max_len, len(sn_word_ids) + len(sp_word_ids))
-            all_lens.append(len(sn_word_ids)+len(sp_word_ids))
+            all_lens.append(len(sn_word_ids) + len(sp_word_ids))
 
             # truncating
             sep_token_sn_word_ids = sn_word_ids[-1]
@@ -2696,10 +2646,8 @@ def process_zuco(
             sn_sp_repr = sn_word_ids + sp_word_ids
 
             mask = [0] * len(sn_word_ids)
-            mask_sn_padding = [0] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (
-                        args.seq_len - len(sn_word_ids) - len(sp_word_ids))
-            mask_transformer_att = [1] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (
-                        args.seq_len - len(sn_word_ids) - len(sp_word_ids))
+            mask_sn_padding = [0] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (args.seq_len - len(sn_word_ids) - len(sp_word_ids))
+            mask_transformer_att = [1] * len(sn_word_ids) + [1] * len(sp_word_ids) + [0] * (args.seq_len - len(sn_word_ids) - len(sp_word_ids))
 
             indices_pos_enc = list(range(0, len(sn_word_ids))) + list(range(0, args.seq_len - len(sn_word_ids)))
 

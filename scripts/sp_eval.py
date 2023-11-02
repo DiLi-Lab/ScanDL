@@ -7,7 +7,10 @@ import numpy as np
 import pandas as pd
 import json
 from argparse import ArgumentParser
-from scanpath_similarity import *
+from scripts.scanpath_similarity import levenshtein_distance
+from scripts.scanpath_similarity import levenshtein_similarity
+from scripts.scanpath_similarity import levenshtein_normalized_distance
+from scripts.scanpath_similarity import levenshtein_normalized_similarity
 
 
 def get_parser():
@@ -96,7 +99,6 @@ def main():
             metrics_filename = f'metrics_{args.generation_outputs}.csv'
 
         metrics_df.to_csv(os.path.join(path_to_outputs, metrics_filename), sep='\t')
-
 
     else:  # for all cross-validation settings
 

@@ -252,7 +252,7 @@ class GaussianDiffusion:
 
     def q_posterior_mean_variance(self, x_start, x_t, t):
         """
-        Compute the mean and variance of the diffusion posterior: 
+        Compute the mean and variance of the diffusion posterior:
             q(x_{t-1} | x_t, x_0)
 
         """
@@ -487,13 +487,13 @@ class GaussianDiffusion:
             sample = th.where(mask==0, x_start, sample)
 
         return {
-            "sample": sample, 
+            "sample": sample,
             "pred_xstart": out["pred_xstart"],
-            "greedy_mean": out["mean"], 
+            "greedy_mean": out["mean"],
             "out": out
         }
 
-    
+
     def p_sample_loop(
         self,
         model,
@@ -711,7 +711,7 @@ class GaussianDiffusion:
 
         else: # predict eps
             pred_xstart = self._predict_xstart_from_eps(x_t=x, t=t, eps=model_output)
-        
+
             pred_prev, _, _ = self.q_posterior_mean_variance(
                 x_start=pred_xstart, x_t=x, t=t
             )
@@ -862,12 +862,12 @@ class GaussianDiffusion:
         if langevin_fn:
             print(t.shape)
             sample=langevin_fn(sample, mean_pred, sigma, self.alphas_cumprod_prev[t[0]], t, x)
-        
+
         if mask == None:
             pass
         else:
             sample = th.where(mask==0, x_start, sample)
-        
+
         return {"sample": sample, "pred_xstart": out["pred_xstart"]}
 
     def ddim_reverse_sample(
