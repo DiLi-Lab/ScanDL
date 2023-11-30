@@ -16,6 +16,7 @@ This repository contains the code to reproduce the experiments in [ScanDL: A Dif
 
 ```bash
 git clone git@github.com:dili-lab/scandl
+cd scandl
 ```
 
 
