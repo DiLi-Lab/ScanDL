@@ -2,7 +2,7 @@
 
 ![scandl-output](img/scanpath-exp-regular.png)
 
-This repository contains the code to reproduce the experiments in [ScanDL: A Diffusion Model for Generating Synthetic Scanpaths on Texts]([https://arxiv.org/abs/2310.15587](https://aclanthology.org/2023.emnlp-main.960/)).
+This repository contains the code to reproduce the experiments in [ScanDL: A Diffusion Model for Generating Synthetic Scanpaths on Texts](https://aclanthology.org/2023.emnlp-main.960/).
 
 ## Summary
 * Our proposed model ScanDL is the first diffusion model for synthetic scanpath generation
