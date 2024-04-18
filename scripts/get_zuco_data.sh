@@ -10,7 +10,7 @@ mkdir -p data/zuco
 pip install osfclient
 
 for zuco_data in q3zws # 2urht  # optional to also get zuco2
-# do
+do
     osf -p $zuco_data clone
     # if [ "$zuco_data" == "2urht" ];   # optional to also get zuco2then
         for task in task1-\ SR task2\ -\ NR task3\ -\ TSR
