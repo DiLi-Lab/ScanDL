@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "ScanDL: A diffusion model for generating synthetic scanpaths on texts"
+authors:
+  - family-names: Bolliger
+    given-names: Lena S.
+  - family-names: Reich
+    given-names: David R.
+  - family-names: Haller
+    given-names: Patrick
+  - family-names: Jakobi
+    given-names: Deborah N.
+  - family-names: Prasse
+    given-names: Paul
+  - family-names: Jäger
+    given-names: Lena A.
+date-released: 2023-12-01
+conference: "Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP 2023)"
+location: "Singapore, Singapore"
+publisher: "Association for Computational Linguistics"
+abstract: "Eye movements in reading play a crucial role in psycholinguistic research studying the cognitive mechanisms underlying human language processing. More recently, the tight coupling between eye movements and cognition has also been leveraged for language-related machine learning tasks such as the interpretability, enhancement, and pre-training of language models, as well as the inference of reader- and text-specific properties. However, scarcity of eye movement data and its unavailability at application time poses a major challenge for this line of research. Initially, this problem was tackled by resorting to cognitive models for synthesizing eye movement data. However, for the sole purpose of generating human-like scanpaths, purely data-driven machine-learning-based methods have proven to be more suitable. Following recent advances in adapting diffusion processes to discrete data, we propose ScanDL, a novel discrete sequence-to-sequence diffusion model that generates synthetic scanpaths on texts. By leveraging pre-trained word representations and jointly embedding both the stimulus text and the fixation sequence, our model captures multi-modal interactions between the two inputs. We evaluate ScanDL within- and across-dataset and demonstrate that it significantly outperforms state-of-the-art scanpath generation methods. Finally, we provide an extensive psycholinguistic analysis that underlines the model's ability to exhibit human-like reading behavior."
